@@ -1,28 +1,34 @@
 async function translate(text, from, to, options) {
     const { config, utils } = options;
     const { tauriFetch: fetch } = utils;
-    let { requestPath: url } = config;
-    let plain_text = text.replaceAll("/", "@@");
-    let encode_text = encodeURIComponent(plain_text);
-    if (url === undefined || url.length === 0) {
-        url = "lingva.pot-app.com"
+
+    const { requestPath = "http://localhost:8989", token } = config;
+    const baseUrl = requestPath.endsWith("/") ? requestPath.slice(0, -1) : requestPath;
+    const url = `${baseUrl}/translate`;
+
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    if (token) {
+        headers.Authorization = token;
     }
-    if (!url.startsWith("http")) {
-        url = `https://${url}`;
-    }
-    const res = await fetch(`${url}/api/v1/${from}/${to}/${encode_text}`, {
-        method: 'GET',
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: {
+            type: 'Json',
+            payload: { from, to, text }
+        }
     });
 
     if (res.ok) {
-        let result = res.data;
-        const { translation } = result;
-        if (translation) {
-            return translation.replaceAll("@@", "/");;
-        } else {
-            throw JSON.stringify(result.trim());
+        const data = res.data;
+        if (!data?.result) {
+            throw new Error("返回结果为空或格式不正确");
         }
+        return data.result;
     } else {
-        throw `Http Request Error\nHttp Status: ${res.status}\n${JSON.stringify(res.data)}`;
+        throw new Error(`请求失败，状态码：${res.status}，响应数据：${JSON.stringify(res.data)}`);
     }
 }
